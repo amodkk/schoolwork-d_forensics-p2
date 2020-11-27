@@ -1,3 +1,3 @@
 #ignore disk image file. over the 100MB github limit
 *.dd
-Code/AnalysisOutput.txt
+*.txt
