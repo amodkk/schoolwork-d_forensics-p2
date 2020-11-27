@@ -26,8 +26,7 @@ output_file = open(OUTPUT_PATH, "w")
 #offset represents the exact current byte offset location in the disk. updates as we progress through the disk image
 offset = 0
 offset_str = "" 
-#bufsize represents the number of bytes that will be loaded into buf at a time. makes the program faster this way, vs constantly having to read from the OS.
-#readlines() will then interate through that data/bytes. when the end of that is reached, <bufsize> number of bytes will be read in again. 
+#bufsize represents the number of bytes that will be loaded into buf at a time. speeds up program, vs constantly having to read from the OS.
 bufsize = 4096
 buf = f.readlines(bufsize)
 
