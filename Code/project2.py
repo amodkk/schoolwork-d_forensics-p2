@@ -5,10 +5,12 @@
 
 #Code description
 #This code recovers files from a binary disk image. 
-#This is done by first locating unique file signatures throughout the disk, recording their offsets, and carving out the file using those offsets.
+#This is done by first locating unique file signatures throughout the disk, recording their offsets, 
+# and carving out the file using those offsets.
 #---------------------------------------------------------------------------------------------------------------------------------
 
-#Sources: garykessler.net for file signatures, lectures for recovery methods & software
+#main sources: garykessler.net for file signatures, active disk editor for signature documentation, 
+# python documentation, lectures for recovery methods & software
 #---------------------------------------------------------------------------------------------------------------------------------
 from pathlib import Path
 from array import *
@@ -41,12 +43,15 @@ bufsize = 4096 #to load larger amount of bytes at once into the program vs const
 matchResults = "" 
 
 #update disk analysis every progress every 5%
+#gets current progress percentage by dividing: (current byte offset/disk image byte size)
 def updateProgress(offset):
         global progress
         new_prog = offset/DISKIMG_SIZE * 100
         if(new_prog >= progress + 2): 
                 progress = int(new_prog)
                 print("Progress: " + str(progress) + " %") 
+                if(progress == 100): 
+                        print("-- Analysis completed --")
 
 #match signatures-- very premature version
 def matchSignatures(offset, data): 
