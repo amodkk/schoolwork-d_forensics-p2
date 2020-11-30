@@ -22,7 +22,7 @@ from enum import Enum
 CURRENTDIR = Path(__file__).parent #dunder/special variable __file__ 
 DISKIMG_FILENAME = "Project2Updated.dd"
 OUTPUT_FILENAME = "AnalysisOutput.txt"
-MATCHES_FILENAME = "MatchResults2_JPG-Trail.txt"
+MATCHES_FILENAME = "MatchResults.txt"
 DISKIMG_PATH = CURRENTDIR.joinpath(DISKIMG_FILENAME)
 OUTPUT_PATH = CURRENTDIR.joinpath(OUTPUT_FILENAME)
 MATCHES_PATH = CURRENTDIR.joinpath(MATCHES_FILENAME)
@@ -34,12 +34,10 @@ OUTPUT_FILE = open(OUTPUT_PATH, "w") #for manual debugging
 SIGS_ARR = [["AVI", "52-49-46-46"], ["BMP", "42-4D(?:-[0-9A-F]{2}){4}-00-00"], ["DOCX", "50-4B-03-04-14-00-06-00"], 
         ["GIF", "47-49-46-38-39-61"], ["JPG", "FF-D8-FF-E0"], ["PDF", "25-50-44-46"], ["PNG", "89-50-4E-47-0D-0A-1A-0A"]]
 
-TRAIL_ARR = [["AVI", ""], ["BMP", ""], ["DOCX", ""], 
-        ["GIF", ""], ["JPG", "FF-D9(?:-00)*$"], ["PDF", ""], ["PNG", ""]]
+TRAIL_ARR = [["AVI", "null"], ["BMP", "null"], ["DOCX", "null"], 
+        ["GIF", "null"], ["JPG", "FF-D9(?:-00)*$"], ["PDF", "null"], ["PNG", "null"]]
 
-seekTrailer = -1
-
-class fileIndices(Enum): #enum values correspond to the file type's location in "SIGS_ARR"
+class fileIndx(Enum): #enum values correspond to the file type's location in "SIGS_ARR"
         AVI = 0
         BMP = 1
         DOCX = 2
@@ -52,6 +50,7 @@ offset = 0 #current byte offset location in disk
 progress = 0 #progress made through disk analysis (in percent)
 bufsize = 4096 #to load larger amount of bytes at once into the program vs constsantly having to read from OS. speeds up program
 matchResults = "" 
+seekTrailer = -1
 
 #match signatures-- very premature version
 def matchSignatures(offset, data): 
@@ -60,18 +59,18 @@ def matchSignatures(offset, data):
         i = 0
         regexMatch = []
         while (i < len(SIGS_ARR)): #check for match against all signatures in SIGS_ARR
-                fileType = SIGS_ARR[i][0]
+                fileType = fileIndx(i).name
                 fileSig = SIGS_ARR[i][1]
-                if(fileType == SIGS_ARR[fileIndices.BMP.value][0]): #BMP requires regex matching
+                if(fileType == SIGS_ARR[fileIndx.BMP.value][0]): #BMP requires regex matching
                         regexMatch = re.findall(fileSig, data) #param 1 contains the regex expression, checks against param2
                 else:
                         match = data.find(fileSig)
                 if(regexMatch or match != -1): #if any potential signature found
-                                result = "Potential " + fileType + " signature found at offset " + str(offset) #str(match + offset)
+                                result = fileType + " signature offset: " + str(offset) #str(match + offset)
                                 print(result)
                                 matchResults += result + "\n"
 
-                                if(i == fileIndices.JPG.value): #only debugging for jpg at this point
+                                if(i == fileIndx.JPG.value or i == fileIndx.AVI.value): #only debugging for jpg at this point
                                         seekTrailer = i
                                 else: 
                                         seekTrailer = -1 #only debugging for jpg at this point
@@ -81,13 +80,30 @@ def matchSignatures(offset, data):
 #match trailer for the associated signature
 def matchTrailer(offset, data): 
         global matchResults #indicating the global var will be changed in this scope
-        fileType = TRAIL_ARR[seekTrailer][0]
+        global seekTrailer
+        endSeek = False
+        fileType = fileIndx(seekTrailer).name
         fileTrail = TRAIL_ARR[seekTrailer][1]
-        regexMatch = re.findall(fileTrail, data) #param 1 contains the regex expression, checks against param2
-        if(regexMatch): 
-                result = "Potential " + fileType + " trailer found at line " + str(offset)
+        if(seekTrailer == -1): 
+                return
+        #AVI file size calculation (this file type doesnt have a consistent trailer from what we found..)
+        if(seekTrailer == fileIndx.AVI.value):  
+                aviHeader = data.replace("-", " ") 
+                hexSize_bArr = bytearray.fromhex(aviHeader)[4:8] #AVI size is indicated by header's bytes 4 through 8, little-endian
+                hexSize_bArr.reverse() #change to big endian 
+                decSize = int(hexSize_bArr.hex(), 16) #byte size of file in decimal format
+                result = fileType + " ending offset: " + str(offset + decSize)
+                endSeek = True
+        #JPG trailer matching
+        elif(seekTrailer == fileIndx.JPG.value):
+                regexMatch = re.findall(fileTrail, data) #param 1 contains the regex expression, checks against param2
+                if(regexMatch): 
+                        result = fileType + " trailer offset: " + str(offset)
+                        endSeek = True
+        if(endSeek): 
                 print(result)
-                matchResults += result + "\n"
+                matchResults += result + "\n\n"
+                seekTrailer = -1
 
 #update disk analysis every progress every 5%
 #gets current progress percentage by dividing: (current byte offset/disk image byte size)
@@ -111,7 +127,7 @@ while buf: #continues looping as long as 'buf' variable is populated
         while (sliceStart < buffLength): 
                 line = buf[sliceStart:sliceStart + SLICE_SIZE].hex('-').upper() #16-byte line of the diskimage data in hex format
                 matchSignatures(offset, line)
-                if(seekTrailer != -1): 
+                if(seekTrailer == fileIndx.JPG.value or seekTrailer == fileIndx.AVI.value): 
                         matchTrailer(offset, line)
                 OUTPUT_FILE.write("Offset " + str(offset) + " | " + line  + "\n")
                 offset += SLICE_SIZE
