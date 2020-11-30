@@ -35,7 +35,9 @@ SIGS_ARR = [["AVI", "52-49-46-46"], ["BMP", "42-4D(?:-[0-9A-F]{2}){4}-00-00"], [
         ["GIF", "47-49-46-38-39-61"], ["JPG", "FF-D8-FF-E0"], ["PDF", "25-50-44-46"], ["PNG", "89-50-4E-47-0D-0A-1A-0A"]]
 
 TRAIL_ARR = [["AVI", "null"], ["BMP", "null"], ["DOCX", "null"], 
-        ["GIF", "null"], ["JPG", "FF-D9(?:-00)*$"], ["PDF", "null"], ["PNG", "null"]]
+        ["GIF", "null"], ["JPG", "FF-D9(?:-00)*$"], ["PDF", "null"], ["PNG", "49-45-4E-44-AE-42-60-82(?:-00)*$"]]
+
+TRAILING_ZEROES_REGEX = "(?:-00)*$"
 
 class fileIndx(Enum): #enum values correspond to the file type's location in "SIGS_ARR"
         AVI = 0
@@ -70,7 +72,7 @@ def matchSignatures(offset, data):
                                 print(result)
                                 matchResults += result + "\n"
 
-                                if(i == fileIndx.JPG.value or i == fileIndx.AVI.value): #only debugging for jpg at this point
+                                if(i == fileIndx.JPG.value or i == fileIndx.AVI.value or i == fileIndx.PNG.value): #only debugging for jpg at this point
                                         seekTrailer = i
                                 else: 
                                         seekTrailer = -1 #only debugging for jpg at this point
@@ -82,6 +84,7 @@ def matchTrailer(offset, data):
         global matchResults #indicating the global var will be changed in this scope
         global seekTrailer
         endSeek = False
+        offsetAdjust = 0
         fileType = fileIndx(seekTrailer).name
         fileTrail = TRAIL_ARR[seekTrailer][1]
         if(seekTrailer == -1): 
@@ -92,13 +95,25 @@ def matchTrailer(offset, data):
                 hexSize_bArr = bytearray.fromhex(aviHeader)[4:8] #AVI size is indicated by header's bytes 4 through 8, little-endian
                 hexSize_bArr.reverse() #change to big endian 
                 decSize = int(hexSize_bArr.hex(), 16) #byte size of file in decimal format
-                result = fileType + " ending offset: " + str(offset + decSize)
+                result = fileType + " ending offset: " + str(offset + decSize + 8) + " (inclusive)"
                 endSeek = True
         #JPG trailer matching
         elif(seekTrailer == fileIndx.JPG.value):
                 regexMatch = re.findall(fileTrail, data) #param 1 contains the regex expression, checks against param2
                 if(regexMatch): 
-                        result = fileType + " trailer offset: " + str(offset)
+                        trailingZeroesRegex = re.findall(TRAILING_ZEROES_REGEX, data)
+                        if(trailingZeroesRegex):
+                                offsetAdjust = 15 - int(trailingZeroesRegex[0].count("-"))
+                        result = fileType + " ending offset: " + str(offset + offsetAdjust) + " (inclusive)"
+                        endSeek = True
+        #PNG trailer matching
+        elif(seekTrailer == fileIndx.PNG.value):
+                regexMatch = re.findall(fileTrail, data)
+                if(regexMatch):
+                        trailingZeroesRegex = re.findall(TRAILING_ZEROES_REGEX, data)
+                        if(trailingZeroesRegex):
+                                offsetAdjust = 15 - int(trailingZeroesRegex[0].count("-"))
+                        result = fileType + " ending offset: " + str(offset + offsetAdjust) + " (inclusive)"
                         endSeek = True
         if(endSeek): 
                 print(result)
@@ -116,8 +131,11 @@ def updateProgress(offset):
                 if(progress == 100): 
                         print("-- Analysis completed --")
 
+#DEBUG LINES
+# DISKIMG.seek(31297536) #debugging BMP regex quicker by starting from that offset
+# offset = 31297536
+
 #this loop reads the diskimage and prints it in hex format to output file
-#DISKIMG.seek(31621120) #debugging BMP regex quicker by starting from that offset
 buf = DISKIMG.read(bufsize)
 while buf: #continues looping as long as 'buf' variable is populated
         sliceStart = 0
@@ -127,7 +145,7 @@ while buf: #continues looping as long as 'buf' variable is populated
         while (sliceStart < buffLength): 
                 line = buf[sliceStart:sliceStart + SLICE_SIZE].hex('-').upper() #16-byte line of the diskimage data in hex format
                 matchSignatures(offset, line)
-                if(seekTrailer == fileIndx.JPG.value or seekTrailer == fileIndx.AVI.value): 
+                if(seekTrailer == fileIndx.JPG.value or seekTrailer == fileIndx.AVI.value or seekTrailer == fileIndx.PNG.value): 
                         matchTrailer(offset, line)
                 OUTPUT_FILE.write("Offset " + str(offset) + " | " + line  + "\n")
                 offset += SLICE_SIZE
