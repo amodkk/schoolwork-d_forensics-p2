@@ -22,7 +22,7 @@ from enum import Enum
 CURRENTDIR = Path(__file__).parent #dunder/special variable __file__ 
 DISKIMG_FILENAME = "Project2Updated.dd"
 OUTPUT_FILENAME = "AnalysisOutput.txt"
-MATCHES_FILENAME = "MatchResults.txt"
+MATCHES_FILENAME = "MatchResults2_JPG-Trail.txt"
 DISKIMG_PATH = CURRENTDIR.joinpath(DISKIMG_FILENAME)
 OUTPUT_PATH = CURRENTDIR.joinpath(OUTPUT_FILENAME)
 MATCHES_PATH = CURRENTDIR.joinpath(MATCHES_FILENAME)
@@ -34,13 +34,60 @@ OUTPUT_FILE = open(OUTPUT_PATH, "w") #for manual debugging
 SIGS_ARR = [["AVI", "52-49-46-46"], ["BMP", "42-4D(?:-[0-9A-F]{2}){4}-00-00"], ["DOCX", "50-4B-03-04-14-00-06-00"], 
         ["GIF", "47-49-46-38-39-61"], ["JPG", "FF-D8-FF-E0"], ["PDF", "25-50-44-46"], ["PNG", "89-50-4E-47-0D-0A-1A-0A"]]
 
+TRAIL_ARR = [["AVI", ""], ["BMP", ""], ["DOCX", ""], 
+        ["GIF", ""], ["JPG", "FF-D9(?:-00)*$"], ["PDF", ""], ["PNG", ""]]
+
+seekTrailer = -1
+
 class fileIndices(Enum): #enum values correspond to the file type's location in "SIGS_ARR"
+        AVI = 0
         BMP = 1
+        DOCX = 2
+        GIF = 3
+        JPG = 4
+        PDF = 5
+        PNG = 6
 
 offset = 0 #current byte offset location in disk
 progress = 0 #progress made through disk analysis (in percent)
 bufsize = 4096 #to load larger amount of bytes at once into the program vs constsantly having to read from OS. speeds up program
 matchResults = "" 
+
+#match signatures-- very premature version
+def matchSignatures(offset, data): 
+        global matchResults #indicating the global var will be changed in this scope
+        global seekTrailer  
+        i = 0
+        regexMatch = []
+        while (i < len(SIGS_ARR)): #check for match against all signatures in SIGS_ARR
+                fileType = SIGS_ARR[i][0]
+                fileSig = SIGS_ARR[i][1]
+                if(fileType == SIGS_ARR[fileIndices.BMP.value][0]): #BMP requires regex matching
+                        regexMatch = re.findall(fileSig, data) #param 1 contains the regex expression, checks against param2
+                else:
+                        match = data.find(fileSig)
+                if(regexMatch or match != -1): #if any potential signature found
+                                result = "Potential " + fileType + " signature found at offset " + str(offset) #str(match + offset)
+                                print(result)
+                                matchResults += result + "\n"
+
+                                if(i == fileIndices.JPG.value): #only debugging for jpg at this point
+                                        seekTrailer = i
+                                else: 
+                                        seekTrailer = -1 #only debugging for jpg at this point
+                                return 
+                i += 1
+
+#match trailer for the associated signature
+def matchTrailer(offset, data): 
+        global matchResults #indicating the global var will be changed in this scope
+        fileType = TRAIL_ARR[seekTrailer][0]
+        fileTrail = TRAIL_ARR[seekTrailer][1]
+        regexMatch = re.findall(fileTrail, data) #param 1 contains the regex expression, checks against param2
+        if(regexMatch): 
+                result = "Potential " + fileType + " trailer found at line " + str(offset)
+                print(result)
+                matchResults += result + "\n"
 
 #update disk analysis every progress every 5%
 #gets current progress percentage by dividing: (current byte offset/disk image byte size)
@@ -53,27 +100,6 @@ def updateProgress(offset):
                 if(progress == 100): 
                         print("-- Analysis completed --")
 
-#match signatures-- very premature version
-def matchSignatures(offset, data): 
-        global matchResults #indicating the global var will be changed in this scope
-        i = 0
-        while (i < len(SIGS_ARR)): #check for match against all signatures in SIGS_ARR
-                fileType = SIGS_ARR[i][0]
-                fileSig = SIGS_ARR[i][1]
-                if(fileType == SIGS_ARR[fileIndices.BMP.value][0]): #add or here for MPG later 
-                        regexMatch = re.findall(fileSig, data) #param 1 contains the regex expression, checks against param2
-                        if(regexMatch): #true if regexMatch has any elements 
-                                result = "Potential " + fileType + " signature found at offset " + str(offset)
-                                print(result)
-                                matchResults += result + "\n"
-                else:
-                        match = data.find(fileSig)
-                        if(match != -1): 
-                                result = "Potential " + fileType + " signature found at offset " + str(offset) #str(match + offset)
-                                print(result)
-                                matchResults += result + "\n"
-                i += 1
-
 #this loop reads the diskimage and prints it in hex format to output file
 #DISKIMG.seek(31621120) #debugging BMP regex quicker by starting from that offset
 buf = DISKIMG.read(bufsize)
@@ -85,6 +111,8 @@ while buf: #continues looping as long as 'buf' variable is populated
         while (sliceStart < buffLength): 
                 line = buf[sliceStart:sliceStart + SLICE_SIZE].hex('-').upper() #16-byte line of the diskimage data in hex format
                 matchSignatures(offset, line)
+                if(seekTrailer != -1): 
+                        matchTrailer(offset, line)
                 OUTPUT_FILE.write("Offset " + str(offset) + " | " + line  + "\n")
                 offset += SLICE_SIZE
                 sliceStart += SLICE_SIZE
