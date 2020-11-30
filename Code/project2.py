@@ -37,9 +37,7 @@ SIGS_ARR = [["AVI", "^52-49-46-46"], ["BMP", "^42-4D(?:-[0-9A-F]{2}){4}-00-00"],
         ["GIF", "^47-49-46-38-39-61"], ["JPG", "^FF-D8-FF-E0"], ["PDF", "^25-50-44-46"], ["PNG", "^89-50-4E-47-0D-0A-1A-0A"]]
 
 TRAIL_ARR = [["AVI", "null"], ["BMP", "null"], ["DOCX", "50-4B-05-06"], 
-        ["GIF", "null"], ["JPG", "FF-D9"], ["PDF", "25-25-45-4F-46"], ["PNG", "49-45-4E-44-AE-42-60-82"]]
-
-TRAILING_ZEROES_REGEX = "(?:-00)*$"
+        ["GIF", "00-00-3B"], ["JPG", "FF-D9"], ["PDF", "25-25-45-4F-46"], ["PNG", "49-45-4E-44-AE-42-60-82"]]
 
 class fileIndx(Enum): #enum values correspond to the file type's location in "SIGS_ARR"
         AVI = 0
@@ -70,8 +68,8 @@ def matchSignatures(offset, data):
                         result = fileType + " signature offset: " + str(offset) #str(match + offset)
                         print(result)
                         matchResults += result + "\n"
-                        if(i == fileIndx.JPG.value or i == fileIndx.AVI.value or i == fileIndx.PNG.value
-                        or i == fileIndx.PDF.value or i == fileIndx.DOCX.value): #only debugging for jpg at this point
+                        if(i in (fileIndx.AVI.value, fileIndx.DOCX.value, fileIndx.GIF.value, 
+                        fileIndx.JPG.value, fileIndx.PDF.value, fileIndx.PNG.value)): #adding one as a time as debugging
                                 seekTrailer = i
                         else: 
                                 seekTrailer = -1 #only debugging for jpg at this point
@@ -98,7 +96,7 @@ def matchTrailer(offset, data):
                 result = fileType + " ending offset: " + str(offset + offsetAdjust) + " (inclusive)"
                 endSeek = True
         #PDF trailer matching
-        elif(seekTrailer in (fileIndx.JPG.value, fileIndx.PNG.value, fileIndx.PDF.value, fileIndx.DOCX.value)):
+        elif(seekTrailer in (fileIndx.DOCX.value, fileIndx.GIF.value, fileIndx.JPG.value, fileIndx.PDF.value, fileIndx.PNG.value)):
                 regexMatch = re.findall(fileTrail, data)
                 if(regexMatch):
                         #adjusting offset
