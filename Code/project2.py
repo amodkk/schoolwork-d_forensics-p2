@@ -24,7 +24,7 @@ from enum import Enum
 CURRENTDIR = Path(__file__).parent #dunder/special variable __file__ 
 DISKIMG_FILENAME = "Project2Updated.dd"
 OUTPUT_FILENAME = "AnalysisOutput.txt"
-MATCHES_FILENAME = "MatchResults2.txt"
+MATCHES_FILENAME = "MatchResults3.txt"
 DISKIMG_PATH = CURRENTDIR.joinpath(DISKIMG_FILENAME)
 DISKIMG_SIZE = Path(DISKIMG_PATH).stat().st_size #size of the disk image, in bytes 
 OUTPUT_PATH = CURRENTDIR.joinpath(OUTPUT_FILENAME) #for manual debugging 
@@ -54,6 +54,16 @@ bufsize = 4096 #to load larger amount of bytes at once into the program vs const
 matchResults = "" 
 seekTrailer = -1
 
+#Summary: takes in a hex string, slices it from 'start' to 'end', slice is interpreted as little-endian order. 
+# The slice is then converted to decimal format and returned. 
+def littleEndianHexToDec(hexStr, start, end):
+        headerLine = hexStr.replace("-", " ") 
+        hex_bArr = bytearray.fromhex(headerLine)[start:end] 
+        hex_bArr.reverse() #change to big endian, needed bytearray for this operation
+        decSize = int(hex_bArr.hex(), 16) #byte size of file in decimal format
+        return decSize
+
+
 #match signatures-- very premature version
 def matchSignatures(offset, data): 
         global matchResults #indicating the global var will be changed in this scope
@@ -68,7 +78,7 @@ def matchSignatures(offset, data):
                         result = fileType + " signature offset: " + str(offset) #str(match + offset)
                         print(result)
                         matchResults += result + "\n"
-                        if(i in (fileIndx.AVI.value, fileIndx.DOCX.value, fileIndx.GIF.value, 
+                        if(i in (fileIndx.AVI.value, fileIndx.BMP.value, fileIndx.DOCX.value, fileIndx.GIF.value, 
                         fileIndx.JPG.value, fileIndx.PDF.value, fileIndx.PNG.value)): #adding one as a time as debugging
                                 seekTrailer = i
                         else: 
@@ -86,16 +96,18 @@ def matchTrailer(offset, data):
         fileTrail = TRAIL_ARR[seekTrailer][1]
         if(seekTrailer == -1): 
                 return
-        #AVI file size calculation (this file type doesnt have a consistent trailer from what we found..)
-        if(seekTrailer == fileIndx.AVI.value):  
-                aviHeader = data.replace("-", " ") 
-                hexSize_bArr = bytearray.fromhex(aviHeader)[4:8] #AVI size is indicated by header's bytes 4 through 8, little-endian
-                hexSize_bArr.reverse() #change to big endian, needed bytearray for this operation
-                decSize = int(hexSize_bArr.hex(), 16) #byte size of file in decimal format
-                offsetAdjust = decSize + 7 #header's file size indicates bytes AFTER indication
+        #AVI, BMP
+        if(seekTrailer in (fileIndx.AVI.value, fileIndx.BMP.value)):  
+                if(seekTrailer == fileIndx.AVI.value): 
+                        decSize = littleEndianHexToDec(data, 4, 8)
+                        offsetAdjust = decSize + 7 #for AVI, data size indicates bytes AFTER the first 7 bytes of header
+                else: #BMP  
+                        decSize = littleEndianHexToDec(data, 2, 6)
+                        offsetAdjust = decSize - 1
                 result = fileType + " ending offset: " + str(offset + offsetAdjust) + " (inclusive)"
                 endSeek = True
-        #PDF trailer matching
+
+        #DOCX, GIF, JPG, PDF, PNG 
         elif(seekTrailer in (fileIndx.DOCX.value, fileIndx.GIF.value, fileIndx.JPG.value, fileIndx.PDF.value, fileIndx.PNG.value)):
                 regexMatch = re.findall(fileTrail, data)
                 if(regexMatch):
