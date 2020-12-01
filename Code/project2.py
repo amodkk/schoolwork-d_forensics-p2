@@ -47,11 +47,9 @@ HDR_FTR_ARR = [["AVI", "^52-49-46-46", "null"],
         ["PDF", "^25-50-44-46", "25-25-45-4F-46"], 
         ["PNG", "^89-50-4E-47-0D-0A-1A-0A", "49-45-4E-44-AE-42-60-82"]]
 
-#Dirty solution for MPG Trailing Zeroes
-TRAILING_ZEROES_RE = "(?:-00)*$"
 
-#Identifies indices of the files in HDR_FTR_ARR
-class fileIndx(Enum): #enum values correspond to the file type's location in "SIGS_ARR"
+#Identifies indices of files in HDR_FTR_ARR
+class fileIndx(Enum):
         AVI = 0
         BMP = 1
         DOCX = 2
@@ -60,6 +58,10 @@ class fileIndx(Enum): #enum values correspond to the file type's location in "SI
         MPG = 5
         PDF = 6
         PNG = 7
+
+
+#Dirty solution for MPG Trailing Zeroes
+TRAILING_ZEROES_RE = "(?:-00)*$"
 
 
 offset = 0 #current byte offset location in disk
