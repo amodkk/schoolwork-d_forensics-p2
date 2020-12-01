@@ -43,10 +43,12 @@ HDR_FTR_ARR = [["AVI", "^52-49-46-46", "null"],
         ["DOCX", "^50-4B-03-04-14-00-06-00", "50-4B-05-06"], 
         ["GIF", "^47-49-46-38-39-61", "00-00-3B"], 
         ["JPG", "^FF-D8-FF-E0", "FF-D9"], 
-        ["MPG", "^00-00-01-B(?:3|A)", "00-00-01-B[^3|A]{1}(?:-00)*$"], 
+        ["MPG", "^00-00-01-B(?:3|A)", "00-00-01-B(?:7|9)(?:-00)*$"], 
         ["PDF", "^25-50-44-46", "25-25-45-4F-46"], 
         ["PNG", "^89-50-4E-47-0D-0A-1A-0A", "49-45-4E-44-AE-42-60-82"]]
 
+#Dirty solution for MPG Trailing Zeroes
+TRAILING_ZEROES_RE = "(?:-00)*$"
 
 #Identifies indices of the files in HDR_FTR_ARR
 class fileIndx(Enum): #enum values correspond to the file type's location in "SIGS_ARR"
@@ -91,10 +93,7 @@ def matchHeaderSigs(offset, data):
                         result = fileType + " signature offset: " + str(offset) #str(match + offset)
                         print(result)
                         matchResults += result + "\n"
-                        if(i != fileIndx.MPG.value): #seek footer sig for everything beside MPG, MPG needs perfecting, see trello
-                                seekFootSig = i
-                        else: 
-                                seekFootSig = -1 #MPG needs perfecting
+                        seekFootSig = i
                         return 
                 i += 1
 
@@ -124,15 +123,19 @@ def matchFooterSigs(offset, data):
         #Everything else: DOCX, GIF, JPG, MPG, PDF, PNG, MPG
         else:
                 regexMatch = re.findall(footerSig, data)
-                if(seekFootSig == fileIndx.MPG.value): 
-                        footerSig = regexMatch[0] #yea this doesn't work as is lol.. too many false positives
                 if(regexMatch):
+                        if(seekFootSig == fileIndx.MPG.value): #brain fart theres probably a much simpler way to do this
+                                footerSig = regexMatch[0] 
+                                trailingZerosRE = re.findall(TRAILING_ZEROES_RE, footerSig)
+                                if(trailingZerosRE):
+                                        trailingZeroesBytes = bytes.fromhex(trailingZerosRE[0].replace("-", " "))
+                                        offsetAdjust -= len(trailingZeroesBytes) #subtract these number of trailing zeroes' bytes from file ending offset
                         #adjusting offset
                         footerLineBytes = bytes.fromhex(data.replace("-", " "))
                         footerSigBytes = bytes.fromhex(footerSig.replace("-", " "))
                         preFSigBytes = footerLineBytes.find(footerSigBytes) #number of bytes before footer sig
                         fSigBytes = len(footerSigBytes) #number of bytes of footer sig
-                        offsetAdjust = preFSigBytes + fSigBytes - 1
+                        offsetAdjust += preFSigBytes + fSigBytes - 1
                         if(seekFootSig == fileIndx.DOCX.value): 
                                 offsetAdjust += 18 #DOCX files have an additional 18 bytes after the trailer sequence
                         result = fileType + " ending offset: " + str(offset + offsetAdjust) + " (inclusive)"
@@ -156,8 +159,8 @@ def updateProgress(offset):
 
 
 #DEBUG LINES
-#DISKIMG.seek(47960064) #debugging BMP regex quicker by starting from that offset
-#offset = 47960064
+#ISKIMG.seek(49859296) #debugging BMP regex quicker by starting from that offset
+#offset = 49859296
 
 
 #this loop reads the diskimage and prints it in hex format to output file
