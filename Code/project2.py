@@ -66,8 +66,12 @@ TRAILING_ZEROES_RE = "(?:-00)*$"
 
 offset = 0 #current byte offset location in disk
 progress = 0 #progress made through disk analysis (in percent)
-bufsize = 4096 #to load larger amount of bytes at once into the program vs constsantly having to read from OS. speeds up program
-matchResults = "" 
+bufsize = 4096 #to load larg amount of bytes at once into the program vs constsantly having to read from OS. speeds up program
+matchResults = "" #manual debugging 
+
+#below variables are not really best practice, refactor what 
+# they're used for if we get time, maybe encapsulate inside a small class
+headOffset = 0
 seekFootSig = -1
 
 
@@ -81,10 +85,37 @@ def littleEndianHexToDec(hexStr, start, end):
         return decSize
 
 
+#carves out file using the starting & ending offset, and saves it to disk 
+def recoverFile(endingOffset, fileType): 
+        global offset 
+        #assign file name and path for recovery 
+        FILE_EXTENSION = fileIndx(seekFootSig).name
+        RECOVER_NAME = str(headOffset) + "." + FILE_EXTENSION.lower() #using offset as name, easiest way to ensure uniqueness
+        RECOVER_PATH = CURRENTDIR.joinpath(RECOVER_NAME)
+
+        #recording old disk position, and navigating to start of file to be recovered
+        ORIGINAL_DISK_POSITION = DISKIMG.tell()
+        DISKIMG.seek(headOffset) #'rewind' to starting offset, when this method is called, read is at ending offset
+        
+        #get data to recover
+        RECOVER_DATA_SIZE = endingOffset - headOffset + 1
+        RECOVER_DATA = DISKIMG.read(RECOVER_DATA_SIZE)
+
+        #write data to file and close
+        RECOVER_FILE = open(RECOVER_PATH, "wb")
+        RECOVER_FILE.write(RECOVER_DATA)
+        RECOVER_FILE.close()
+
+        #go back to original disk position
+        DISKIMG.seek(ORIGINAL_DISK_POSITION)
+
+
+
 #match signatures-- very premature version
 def matchHeaderSigs(offset, data): 
         global matchResults #indicating the global var will be changed in this scope
         global seekFootSig  
+        global headOffset
         i = 0
         regexMatch = []
         while (i < len(HDR_FTR_ARR)): #check for match against all signatures in SIGS_ARR
@@ -92,9 +123,12 @@ def matchHeaderSigs(offset, data):
                 fileSig = HDR_FTR_ARR[i][1] 
                 regexMatch = re.findall(fileSig, data) #param 1 contains the regex expression, checks against param2
                 if(regexMatch): #if any potential signature found
+                        #following 3 lines are for manual debugging
                         result = fileType + " signature offset: " + str(offset) #str(match + offset)
                         print(result)
                         matchResults += result + "\n"
+
+                        headOffset = offset
                         seekFootSig = i
                         return 
                 i += 1
@@ -142,9 +176,11 @@ def matchFooterSigs(offset, data):
                                 offsetAdjust += 18 #DOCX files have an additional 18 bytes after the trailer sequence
                         result = fileType + " ending offset: " + str(offset + offsetAdjust) + " (inclusive)"
                         endSeek = True
-        if(endSeek): 
+                        
+        if(endSeek): #footer signature was found
                 print(result)
                 matchResults += result + "\n\n"
+                recoverFile(offset + offsetAdjust, seekFootSig)
                 seekFootSig = -1
 
 
@@ -165,6 +201,8 @@ def updateProgress(offset):
 #offset = 49859296
 
 
+#MAIN()... basically
+#----------------------------------------------------------------------------------------
 #this loop reads the diskimage and prints it in hex format to output file
 buf = DISKIMG.read(bufsize)
 while buf: #continues looping as long as 'buf' variable is populated
