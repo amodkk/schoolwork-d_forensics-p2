@@ -18,6 +18,7 @@ from pathlib import Path
 from array import *
 import re 
 from enum import Enum
+from hashlib import sha256
 
 
 #Paths
@@ -105,6 +106,12 @@ def recoverFile(endingOffset, fileType):
         RECOVER_FILE = open(RECOVER_PATH, "wb")
         RECOVER_FILE.write(RECOVER_DATA)
         RECOVER_FILE.close()
+
+        #sha256 hash of the file
+        print("Recovered file name: " + RECOVER_NAME)
+        sha256Hash = sha256(RECOVER_DATA).hexdigest()
+        print("SHA-256 hash: " + sha256Hash)
+        print("--------------------------------------------------------------------\n") #an attempt at somewhat pretty formatting
 
         #go back to original disk position
         DISKIMG.seek(ORIGINAL_DISK_POSITION)
