@@ -4,4 +4,4 @@
 
 [Binwalk results](https://github.com/mrf0012/COMP-5350/blob/main/Docs/PROJECT%202%20BINWALK%20RESULTS.pdf)
 
-[Real SHA256 hashes of all project files (for comparison against hashes produced by code)](https://github.com/mrf0012/COMP-5350/blob/main/Docs/Proj2%20SHA256%20Reference.pdf)
+[Verified SHA256 hashes of all project files (for comparison against hashes produced by code)](https://github.com/mrf0012/COMP-5350/blob/main/Docs/Proj2%20SHA256%20Reference.pdf)
