@@ -1,3 +1,12 @@
 #ignore disk image file. over the 100MB github limit
 *.dd
 *.txt
+debug.log
+*.avi
+*.bmp
+*.docx
+*.gif
+*.jpg
+*.mpg
+*.pdf
+*.png
