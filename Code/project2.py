@@ -26,10 +26,12 @@ CURRENTDIR = Path(__file__).parent #dunder/special variable __file__
 DISKIMG_FILENAME = "Project2Updated.dd"
 OUTPUT_FILENAME = "AnalysisOutput.txt"
 MATCHES_FILENAME = "MatchResults.txt"
+RECOVERY_DIRNAME = "RecoveredFiles"
 DISKIMG_PATH = CURRENTDIR.joinpath(DISKIMG_FILENAME)
 DISKIMG_SIZE = Path(DISKIMG_PATH).stat().st_size #size of the disk image, in bytes 
 OUTPUT_PATH = CURRENTDIR.joinpath(OUTPUT_FILENAME) #for manual debugging 
 MATCHES_PATH = CURRENTDIR.joinpath(MATCHES_FILENAME) #for manual debugging
+RECOVERY_DIRPATH = CURRENTDIR.joinpath(RECOVERY_DIRNAME)
 
 
 #File Streams
@@ -43,7 +45,7 @@ HDR_FTR_ARR = [["AVI", "^52-49-46-46", "null"],
         ["BMP", "^42-4D(?:-[0-9A-F]{2}){4}-00-00", "null"], 
         ["DOCX", "^50-4B-03-04-14-00-06-00", "50-4B-05-06"], 
         ["GIF", "^47-49-46-38-39-61", "00-00-3B"], 
-        ["JPG", "^FF-D8-FF-E0", "FF-D9"], 
+        ["JPG", "^(?:FF-D8-FF-E0|FF-D8-FF-DB)", "FF-D9"], 
         ["MPG", "^00-00-01-B(?:3|A)", "00-00-01-B(?:7|9)(?:-00)*$"], 
         ["PDF", "^25-50-44-46", "25-25-45-4F-46"], 
         ["PNG", "^89-50-4E-47-0D-0A-1A-0A", "49-45-4E-44-AE-42-60-82"]]
@@ -74,6 +76,7 @@ matchResults = "" #manual debugging
 # they're used for if we get time, maybe encapsulate inside a small class
 headOffset = 0
 seekFootSig = -1
+filesRecovered = 1
 
 
 #Summary: takes in a hex string, slices it from 'start' to 'end', slice is interpreted as little-endian order. 
@@ -88,11 +91,13 @@ def littleEndianHexToDec(hexStr, start, end):
 
 #carves out file using the starting & ending offset, and saves it to disk 
 def recoverFile(endingOffset, fileType): 
-        global offset 
+        global filesRecovered
+
         #assign file name and path for recovery 
         FILE_EXTENSION = fileIndx(seekFootSig).name
-        RECOVER_NAME = str(headOffset) + "." + FILE_EXTENSION.lower() #using offset as name, easiest way to ensure uniqueness
-        RECOVER_PATH = CURRENTDIR.joinpath(RECOVER_NAME)
+        RECOVER_NAME = "File" + str(filesRecovered) + "." + FILE_EXTENSION.lower()
+        Path(RECOVERY_DIRPATH).mkdir(parents=True, exist_ok=True) #intialize 'RecoveredFiles' directory first
+        RECOVERY_FILEPATH = RECOVERY_DIRPATH.joinpath(RECOVER_NAME)
 
         #recording old disk position, and navigating to start of file to be recovered
         ORIGINAL_DISK_POSITION = DISKIMG.tell()
@@ -103,18 +108,20 @@ def recoverFile(endingOffset, fileType):
         RECOVER_DATA = DISKIMG.read(RECOVER_DATA_SIZE)
 
         #write data to file and close
-        RECOVER_FILE = open(RECOVER_PATH, "wb")
+        RECOVER_FILE = open(RECOVERY_FILEPATH, "wb")
         RECOVER_FILE.write(RECOVER_DATA)
         RECOVER_FILE.close()
 
         #sha256 hash of the file
-        print("Recovered file name: " + RECOVER_NAME)
-        sha256Hash = sha256(RECOVER_DATA).hexdigest()
-        print("SHA-256 hash: " + sha256Hash)
-        print("--------------------------------------------------------------------\n") #an attempt at somewhat pretty formatting
+        output = "Recovered file: " + RECOVER_NAME + ", "
+        output += "Start offset: " + str(headOffset) + ", End offset: " + str(endingOffset) + "\n"
+        output += "SHA-256 hash: " + sha256(RECOVER_DATA).hexdigest() + "\n"
+        output += "--------------------------------------------------------------------\n"
+        print(output)
 
         #go back to original disk position
         DISKIMG.seek(ORIGINAL_DISK_POSITION)
+        filesRecovered += 1
 
 
 
@@ -212,6 +219,8 @@ def updateProgress(offset):
 #----------------------------------------------------------------------------------------
 #this loop reads the diskimage and prints it in hex format to output file
 buf = DISKIMG.read(bufsize)
+print("Analyzing " + "'" + DISKIMG_FILENAME + "' . . . ")
+print("--------------------------------------------------------------------\n")
 while buf: #continues looping as long as 'buf' variable is populated
         sliceStart = 0
         SLICE_SIZE = 16
@@ -236,4 +245,5 @@ MATCHES_FILE = open(MATCHES_PATH, "w")
 MATCHES_FILE.write("-- MATCH RESULTS --\n")
 MATCHES_FILE.write(matchResults)
 MATCHES_FILE.close()
+print("-- Recovered files can be found in the \RecoveredFiles direectory.")
 print("-- See output file 'MatchResults' for manual debugging --")
