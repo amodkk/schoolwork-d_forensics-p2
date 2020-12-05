@@ -29,14 +29,14 @@ MATCHES_FILENAME = "MatchResults.txt"
 RECOVERY_DIRNAME = "RecoveredFiles"
 DISKIMG_PATH = CURRENTDIR.joinpath(DISKIMG_FILENAME)
 DISKIMG_SIZE = Path(DISKIMG_PATH).stat().st_size #size of the disk image, in bytes 
-OUTPUT_PATH = CURRENTDIR.joinpath(OUTPUT_FILENAME) #for manual debugging 
+#OUTPUT_PATH = CURRENTDIR.joinpath(OUTPUT_FILENAME) #for manual debugging 
 MATCHES_PATH = CURRENTDIR.joinpath(MATCHES_FILENAME) #for manual debugging
 RECOVERY_DIRPATH = CURRENTDIR.joinpath(RECOVERY_DIRNAME)
 
 
 #File Streams
 DISKIMG = open(DISKIMG_PATH, "rb")
-OUTPUT_FILE = open(OUTPUT_PATH, "w") #for manual debugging
+#OUTPUT_FILE = open(OUTPUT_PATH, "w") #for manual debugging
 
 
 #2D-Array of files' unique header & footer sigs 
@@ -232,12 +232,12 @@ while buf: #continues looping as long as 'buf' variable is populated
                 matchHeaderSigs(offset, line)
                 if(seekFootSig != -1): 
                         matchFooterSigs(offset, line)
-                OUTPUT_FILE.write("Offset " + str(offset) + " | " + line  + "\n")
+                #OUTPUT_FILE.write("Offset " + str(offset) + " | " + line  + "\n")
                 offset += SLICE_SIZE
                 sliceStart += SLICE_SIZE
                 updateProgress(offset)
         buf = DISKIMG.read(bufsize)
-OUTPUT_FILE.close()
+#OUTPUT_FILE.close()
 DISKIMG.close()
 
 #create output file showing matches & match locations
