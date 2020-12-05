@@ -47,7 +47,7 @@ HDR_FTR_ARR = [["AVI", "^52-49-46-46", "null"],
         ["GIF", "^47-49-46-38-39-61", "00-00-3B"], 
         ["JPG", "^(?:FF-D8-FF-E0|FF-D8-FF-DB)", "FF-D9"], 
         ["MPG", "^00-00-01-B(?:3|A)", "00-00-01-B(?:7|9)(?:-00)*$"], 
-        ["PDF", "^25-50-44-46", "25-25-45-4F-46"], 
+        ["PDF", "^25-50-44-46", "25-25-45-4F-46(?:-0A)?"], 
         ["PNG", "^89-50-4E-47-0D-0A-1A-0A", "49-45-4E-44-AE-42-60-82"]]
 
 
@@ -174,13 +174,15 @@ def matchFooterSigs(offset, data):
         else:
                 regexMatch = re.findall(footerSig, data)
                 if(regexMatch):
+                        #offset adjustment occurs inside this if
                         if(seekFootSig == fileIndx.MPG.value): #brain fart theres probably a much simpler way to do this
                                 footerSig = regexMatch[0] 
                                 trailingZerosRE = re.findall(TRAILING_ZEROES_RE, footerSig)
                                 if(trailingZerosRE):
                                         trailingZeroesBytes = bytes.fromhex(trailingZerosRE[0].replace("-", " "))
                                         offsetAdjust -= len(trailingZeroesBytes) #subtract these number of trailing zeroes' bytes from file ending offset
-                        #adjusting offset
+                        if(seekFootSig == fileIndx.PDF.value): 
+                                footerSig = max(regexMatch, key=len) #get longest match b/c pdf trailer can be followed by 0D-0A or 0A
                         footerLineBytes = bytes.fromhex(data.replace("-", " "))
                         footerSigBytes = bytes.fromhex(footerSig.replace("-", " "))
                         preFSigBytes = footerLineBytes.find(footerSigBytes) #number of bytes before footer sig
